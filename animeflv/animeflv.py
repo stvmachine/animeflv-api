@@ -1,6 +1,5 @@
-import cloudscraper
+import requests
 import json, re
-
 from typing import Dict, List, Optional, Tuple, Type, Union
 from types import TracebackType
 from bs4 import BeautifulSoup, Tag, ResultSet
@@ -8,6 +7,13 @@ from urllib.parse import unquote, urlencode
 from enum import Flag, auto
 from .exception import AnimeFLVParseError
 from dataclasses import dataclass
+import pprint
+
+requests.packages.urllib3.disable_warnings(
+    requests.packages.urllib3.exceptions.InsecureRequestWarning
+)
+
+pp = pprint.PrettyPrinter(indent=4)
 
 
 def removeprefix(str: str, prefix: str) -> str:
@@ -68,6 +74,7 @@ class AnimeInfo:
     debut: Optional[str] = None
     type: Optional[str] = None
     episodes: Optional[List[EpisodeInfo]] = None
+    num_episodes: int = 0
 
 
 @dataclass
@@ -83,8 +90,19 @@ class EpisodeFormat(Flag):
 
 class AnimeFLV(object):
     def __init__(self, *args, **kwargs):
-        session = kwargs.get("session", None)
-        self._scraper = cloudscraper.create_scraper(session)
+        # session = kwargs.get("session", None)
+        self._scraper = requests.Session()
+
+    def open(self, url):
+        response = self._scraper.get(
+            "http://api.scraperapi.com",
+            params={
+                "api_key": "fa34370828278bc431774941db641198",
+                "url": url,  ## Cloudflare protected website
+                "bypass": "cloudflare",
+            },
+        )
+        return response
 
     def close(self) -> None:
         self._scraper.close()
@@ -123,7 +141,7 @@ class AnimeFLV(object):
         :param **kwargs: Optional arguments for filter output (see doc).
         :rtype: list
         """
-        response = self._scraper.get(f"{ANIME_VIDEO_URL}{id}-{episode}")
+        response = self.open(f"{ANIME_VIDEO_URL}{id}-{episode}")
         soup = BeautifulSoup(response.text, "lxml")
         table = soup.find("table", attrs={"class": "RTbl"})
 
@@ -182,7 +200,7 @@ class AnimeFLV(object):
         if params != "":
             url += f"?{params}"
 
-        response = self._scraper.get(url)
+        response = self.open(url)
         soup = BeautifulSoup(response.text, "lxml")
 
         elements = soup.select("div.Container ul.ListAnimes li article")
@@ -208,7 +226,7 @@ class AnimeFLV(object):
         :rtype: list
         """
 
-        response = self._scraper.get(f"{ANIME_VIDEO_URL}{id}-{episode}")
+        response = self.open(f"{ANIME_VIDEO_URL}{id}-{episode}")
         soup = BeautifulSoup(response.text, "lxml")
         scripts = soup.find_all("script")
 
@@ -235,7 +253,7 @@ class AnimeFLV(object):
         :rtype: list
         """
 
-        response = self._scraper.get(BASE_URL)
+        response = self.open(BASE_URL)
         soup = BeautifulSoup(response.text, "lxml")
 
         elements = soup.select("ul.ListEpisodios li a")
@@ -265,7 +283,7 @@ class AnimeFLV(object):
         :rtype: list
         """
 
-        response = self._scraper.get(BASE_URL)
+        response = self.open(BASE_URL)
         soup = BeautifulSoup(response.text, "lxml")
 
         elements = soup.select("ul.ListAnimes li article")
@@ -283,7 +301,7 @@ class AnimeFLV(object):
         :param id: Anime id, like as 'nanatsu-no-taizai'.
         :rtype: dict
         """
-        response = self._scraper.get(f"{ANIME_URL}/{id}")
+        response = self.open(f"{ANIME_URL}/{id}")
         soup = BeautifulSoup(response.text, "lxml")
 
         information = {
@@ -352,6 +370,7 @@ class AnimeFLV(object):
         return AnimeInfo(
             id=id,
             episodes=episodes,
+            num_episodes=0 if episodes is None else len(episodes),
             genres=genres,
             **information,
         )
@@ -372,13 +391,17 @@ class AnimeFLV(object):
                             element.select_one("a div.Image figure img").get(
                                 "src", None
                             )
-                            or element.select_one("a div.Image figure img")["data-cfsrc"]
+                            or element.select_one("a div.Image figure img")[
+                                "data-cfsrc"
+                            ]
                         ),
                         banner=(
                             element.select_one("a div.Image figure img").get(
                                 "src", None
                             )
-                            or element.select_one("a div.Image figure img")["data-cfsrc"]
+                            or element.select_one("a div.Image figure img")[
+                                "data-cfsrc"
+                            ]
                         )
                         .replace("covers", "banners")
                         .strip(),
