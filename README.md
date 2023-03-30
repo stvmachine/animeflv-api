@@ -33,10 +33,10 @@ python3 -m animeflv get_all_links "made-in-abyss" 1 25 True
 
 - [X] Group episodes and links
 - [X] Added whitelist of servers
-- [] Generate the output as a file to allow JDownloader to pickup automatically
+- [ ] Generate the output as a file in a format that JDownloader can use.
 
 ## License
 
 [MIT](./LICENSE)
 
-## Forked from <https://github.com/stvmachine/animeflv-api>
+## Forked from <https://github.com/jorgeajimenezl/animeflv-api>
