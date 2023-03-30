@@ -1,5 +1,6 @@
 import requests
 import json, re
+import os
 from typing import Dict, List, Optional, Tuple, Type, Union
 from types import TracebackType
 from bs4 import BeautifulSoup, Tag, ResultSet
@@ -7,13 +8,17 @@ from urllib.parse import unquote, urlencode
 from enum import Flag, auto
 from .exception import AnimeFLVParseError
 from dataclasses import dataclass
-import pprint
+from dotenv import load_dotenv
+
+load_dotenv()
+SCRAPPER_API_KEY = os.getenv("SCRAPPER_API_KEY")
+
+# Not secret
+SCRAPPER_API_URL = "http://api.scraperapi.com"
 
 requests.packages.urllib3.disable_warnings(
     requests.packages.urllib3.exceptions.InsecureRequestWarning
 )
-
-pp = pprint.PrettyPrinter(indent=4)
 
 
 def removeprefix(str: str, prefix: str) -> str:
@@ -48,11 +53,12 @@ def parse_table(table: Tag):
     return rows
 
 
-BASE_URL = "https://animeflv.net"
-BROWSE_URL = "https://animeflv.net/browse"
-ANIME_VIDEO_URL = "https://animeflv.net/ver/"
-ANIME_URL = "https://animeflv.net/anime/"
-BASE_EPISODE_IMG_URL = "https://cdn.animeflv.net/screenshots/"
+BASE = "animeflv.net"
+BASE_URL = "https://www." + BASE
+BROWSE_URL = BASE_URL + "/browse"
+ANIME_VIDEO_URL = BASE_URL + "/ver/"
+ANIME_URL = BASE_URL + "/anime/"
+BASE_EPISODE_IMG_URL = "https://cdn." + BASE + "/screenshots/"
 
 
 @dataclass
@@ -90,19 +96,24 @@ class EpisodeFormat(Flag):
 
 class AnimeFLV(object):
     def __init__(self, *args, **kwargs):
-        # session = kwargs.get("session", None)
+        # session = kwargs.get("session", None) # not used
         self._scraper = requests.Session()
 
     def open(self, url):
+        self.url_ok(url)
         response = self._scraper.get(
-            "http://api.scraperapi.com",
+            SCRAPPER_API_URL,
             params={
-                "api_key": "fa34370828278bc431774941db641198",
-                "url": url,  ## Cloudflare protected website
+                "api_key": SCRAPPER_API_KEY,
+                "url": url,
                 "bypass": "cloudflare",
             },
         )
         return response
+
+    def url_ok(self, url):
+        r = requests.head(url)
+        return r.status_code == 200
 
     def close(self) -> None:
         self._scraper.close()
